@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Result</title>
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            background: #f4f4f4;
+        }
+        .box {
+            background: white;
+            padding: 20px;
+            margin: 50px auto;
+            width: 500px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>{{ username }}'s Result</h2>
+
+    <h3>Score: {{ score }}</h3>
+    <h3>Percentage: {{ percentage }}%</h3>
+    <h3>Status: {{ status }}</h3>
+
+    <br>
+    <a href="/">Play Again</a><br><br>
+    <a href="/leaderboard">Leaderboard</a>
+</div>
+
+</body>
+</html>

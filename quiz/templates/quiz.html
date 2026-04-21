@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quiz</title>
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            background: #f4f4f4;
+        }
+        .question {
+            display: none;
+        }
+        .active {
+            display: block;
+        }
+        .box {
+            background: white;
+            padding: 20px;
+            margin: 50px auto;
+            width: 500px;
+            border-radius: 10px;
+        }
+        button {
+            padding: 10px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="box">
+<h2>Quiz</h2>
+
+<form method="POST" action="/submit">
+
+{% if questions %}
+
+    {% for q in questions %}
+    <div class="question">
+        
+        <p>{{ loop.index }}. {{ q[1] }}</p>
+
+        <input type="radio" name="q{{ loop.index }}" value="1"> {{ q[2] }}<br>
+        <input type="radio" name="q{{ loop.index }}" value="2"> {{ q[3] }}<br>
+
+        {% if not loop.first %}
+            <button type="button" onclick="prevQuestion()">Previous</button>
+        {% endif %}
+
+        {% if not loop.last %}
+            <button type="button" onclick="nextQuestion({{ loop.index-1 }})">Next</button>
+        {% else %}
+            <button type="submit">Submit</button>
+        {% endif %}
+
+    </div>
+    {% endfor %}
+
+{% else %}
+    <h3>No questions found</h3>
+{% endif %}
+
+</form>
+</div>
+
+<script>
+let current = 0;
+let questions;
+
+// Run after page loads
+window.onload = function() {
+    questions = document.querySelectorAll(".question");
+
+    if (questions.length > 0) {
+        questions[0].classList.add("active"); // show first question
+    }
+};
+
+// Show question
+function showQuestion(index) {
+    questions.forEach(q => q.classList.remove("active"));
+
+    if (questions[index]) {
+        questions[index].classList.add("active");
+    }
+}
+
+// Next
+function nextQuestion(index) {
+    let selected = document.querySelector(`input[name="q${index+1}"]:checked`);
+
+    if (!selected) {
+        alert("Please select an answer!");
+        return;
+    }
+
+    current++;
+    showQuestion(current);
+}
+
+// Previous
+function prevQuestion() {
+    current--;
+    showQuestion(current);
+}
+</script>
+
+</body>
+</html>
