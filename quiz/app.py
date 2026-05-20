@@ -32,6 +32,7 @@ def login():
     if request.method == 'POST':
 
         username = request.form['name']
+
         session['username'] = username
 
         return render_template('subjects.html')
@@ -40,15 +41,15 @@ def login():
 
 
 # -----------------------------------
-# SUBJECT PAGE
+# QUIZ PAGE
 # -----------------------------------
 @app.route('/quiz/<subject>')
 def quiz(subject):
 
     if not db_connected:
         return """
-        <h2>Database not connected!</h2>
-        <p>This project works fully on local MySQL.</p>
+        <h2>Database not connected</h2>
+        <p>Online deployment cannot access localhost MySQL.</p>
         """
 
     cursor.execute(
@@ -57,9 +58,6 @@ def quiz(subject):
     )
 
     quiz_questions = cursor.fetchall()
-
-    session['quiz_questions'] = quiz_questions
-    session['subject'] = subject
 
     return render_template(
         'quiz.html',
@@ -75,17 +73,27 @@ def quiz(subject):
 def submit():
 
     if not db_connected:
-        return "<h2>Database not connected</h2>"
+        return """
+        <h2>Database not connected</h2>
+        """
 
     username = session.get('username')
-    quiz_questions = session.get('quiz_questions')
-    subject = session.get('subject')
+
+    subject = request.form.get('subject')
+
+    cursor.execute(
+        "SELECT * FROM questions WHERE subject=%s LIMIT 5",
+        (subject,)
+    )
+
+    quiz_questions = cursor.fetchall()
 
     score = 0
 
     for i, q in enumerate(quiz_questions):
 
         user_answer = request.form.get(f"q{i+1}")
+
         correct_answer = q[4]
 
         if user_answer == correct_answer:
@@ -97,9 +105,9 @@ def submit():
 
     status = "Pass ✅" if percentage >= 50 else "Fail ❌"
 
-    # Save result
+    # SAVE RESULT
     cursor.execute(
-        "INSERT INTO results (name, score, subject) VALUES (%s, %s, %s)",
+        "INSERT INTO results(name, score, subject) VALUES(%s, %s, %s)",
         (username, score, subject)
     )
 
