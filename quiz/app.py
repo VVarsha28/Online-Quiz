@@ -1,26 +1,7 @@
 from flask import Flask, render_template, request, session
-import mysql.connector
 
 app = Flask(__name__)
 app.secret_key = "quiz_secret_key"
-
-# -----------------------------------
-# MYSQL CONNECTION
-# -----------------------------------
-try:
-    db = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="Varsha@28",
-        database="quiz_system"
-    )
-
-    cursor = db.cursor()
-    db_connected = True
-
-except:
-    print("MySQL connection failed")
-    db_connected = False
 
 
 # -----------------------------------
@@ -46,18 +27,14 @@ def login():
 @app.route('/quiz/<subject>')
 def quiz(subject):
 
-    if not db_connected:
-        return """
-        <h2>Database not connected</h2>
-        <p>Online deployment cannot access localhost MySQL.</p>
-        """
-
-    cursor.execute(
-        "SELECT * FROM questions WHERE subject=%s ORDER BY RAND() LIMIT 5",
-        (subject,)
-    )
-
-    quiz_questions = cursor.fetchall()
+    # Dummy questions for deployment demo
+    quiz_questions = [
+        (1, "What is Python?", "Programming Language", "Snake", "1"),
+        (2, "What is DBMS?", "Database Management System", "Operating System", "1"),
+        (3, "HTML stands for?", "Hyper Text Markup Language", "High Text Machine Language", "1"),
+        (4, "Which is immutable?", "Tuple", "List", "1"),
+        (5, "Which keyword defines function?", "def", "func", "1")
+    ]
 
     return render_template(
         'quiz.html',
@@ -72,54 +49,30 @@ def quiz(subject):
 @app.route('/submit', methods=['POST'])
 def submit():
 
-    if not db_connected:
-        return """
-        <h2>Database not connected</h2>
-        """
-
     username = session.get('username')
-
-    subject = request.form.get('subject')
-
-    cursor.execute(
-        "SELECT * FROM questions WHERE subject=%s LIMIT 5",
-        (subject,)
-    )
-
-    quiz_questions = cursor.fetchall()
 
     score = 0
 
-    for i, q in enumerate(quiz_questions):
+    # Dummy answers
+    correct_answers = ['1', '1', '1', '1', '1']
+
+    for i in range(5):
 
         user_answer = request.form.get(f"q{i+1}")
 
-        correct_answer = q[4]
-
-        if user_answer == correct_answer:
+        if user_answer == correct_answers[i]:
             score += 1
 
-    total_questions = len(quiz_questions)
-
-    percentage = (score / total_questions) * 100
+    percentage = (score / 5) * 100
 
     status = "Pass ✅" if percentage >= 50 else "Fail ❌"
-
-    # SAVE RESULT
-    cursor.execute(
-        "INSERT INTO results(name, score, subject) VALUES(%s, %s, %s)",
-        (username, score, subject)
-    )
-
-    db.commit()
 
     return render_template(
         'result.html',
         username=username,
         score=score,
         percentage=percentage,
-        status=status,
-        subject=subject
+        status=status
     )
 
 
@@ -129,15 +82,12 @@ def submit():
 @app.route('/leaderboard/<subject>')
 def leaderboard(subject):
 
-    if not db_connected:
-        return "<h2>Database not connected</h2>"
-
-    cursor.execute(
-        "SELECT * FROM results WHERE subject=%s ORDER BY score DESC",
-        (subject,)
-    )
-
-    data = cursor.fetchall()
+    # Dummy leaderboard data
+    data = [
+        (1, "Varsha", 5),
+        (2, "Student1", 4),
+        (3, "Student2", 3)
+    ]
 
     return render_template(
         'leaderboard.html',
