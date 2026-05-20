@@ -1,202 +1,92 @@
-from flask import Flask, render_template, request
-import sqlite3
-import random
+from flask import Flask, render_template, request, session
+import mysql.connector
 
 app = Flask(__name__)
+app.secret_key = "quiz_secret_key"
 
-# -------------------------------
-# DATABASE CONNECTION
-# -------------------------------
-def get_db_connection():
-    conn = sqlite3.connect('quiz.db')
-    conn.row_factory = sqlite3.Row
-    return conn
+# -----------------------------------
+# MYSQL CONNECTION
+# -----------------------------------
+try:
+    db = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="Varsha@28",
+        database="quiz_system"
+    )
+
+    cursor = db.cursor()
+    db_connected = True
+
+except:
+    print("MySQL connection failed")
+    db_connected = False
 
 
-# -------------------------------
-# CREATE TABLES
-# -------------------------------
-conn = get_db_connection()
-cursor = conn.cursor()
-
-# Questions Table
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS questions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    subject TEXT,
-    question TEXT,
-    option1 TEXT,
-    option2 TEXT,
-    option3 TEXT,
-    option4 TEXT,
-    answer TEXT
-)
-''')
-
-# Results Table
-cursor.execute('''
-CREATE TABLE IF NOT EXISTS results (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    subject TEXT,
-    score INTEGER
-)
-''')
-
-conn.commit()
-
-# -------------------------------
-# INSERT SAMPLE QUESTIONS
-# -------------------------------
-cursor.execute("SELECT COUNT(*) FROM questions")
-count = cursor.fetchone()[0]
-
-if count == 0:
-
-    questions_data = [
-
-        # Python
-        (
-            "Python",
-            "Which keyword is used to define a function?",
-            "func",
-            "define",
-            "def",
-            "function",
-            "def"
-        ),
-
-        (
-            "Python",
-            "Which symbol is used for comments in Python?",
-            "//",
-            "#",
-            "/*",
-            "%",
-            "#"
-        ),
-
-        (
-            "Python",
-            "Python is developed by?",
-            "James Gosling",
-            "Dennis Ritchie",
-            "Guido van Rossum",
-            "Bjarne Stroustrup",
-            "Guido van Rossum"
-        ),
-
-        # DBMS
-        (
-            "DBMS",
-            "What does DBMS stand for?",
-            "Data Base Management System",
-            "Data Backup Management System",
-            "Database Memory System",
-            "None",
-            "Data Base Management System"
-        ),
-
-        (
-            "DBMS",
-            "Which language is used in MySQL?",
-            "SQL",
-            "Python",
-            "Java",
-            "HTML",
-            "SQL"
-        ),
-
-        (
-            "DBMS",
-            "Primary key uniquely identifies?",
-            "Column",
-            "Row",
-            "Table",
-            "Database",
-            "Row"
-        )
-    ]
-
-    cursor.executemany('''
-    INSERT INTO questions
-    (subject, question, option1, option2, option3, option4, answer)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', questions_data)
-
-    conn.commit()
-
-conn.close()
-
-# -------------------------------
+# -----------------------------------
 # LOGIN PAGE
-# -------------------------------
+# -----------------------------------
 @app.route('/', methods=['GET', 'POST'])
 def login():
-
-    global username
-    global selected_subject
-    global quiz_questions
 
     if request.method == 'POST':
 
         username = request.form['name']
-        selected_subject = request.form['subject']
+        session['username'] = username
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "SELECT * FROM questions WHERE subject=?",
-            (selected_subject,)
-        )
-
-        all_questions = cursor.fetchall()
-
-        if len(all_questions) == 0:
-            return "<h2>No questions found for this subject!</h2>"
-
-        quiz_questions = random.sample(
-            list(all_questions),
-            min(5, len(all_questions))
-        )
-
-        conn.close()
-
-        return render_template(
-            'quiz.html',
-            questions=quiz_questions,
-            subject=selected_subject
-        )
+        return render_template('subjects.html')
 
     return render_template('login.html')
 
 
-# -------------------------------
+# -----------------------------------
+# SUBJECT PAGE
+# -----------------------------------
+@app.route('/quiz/<subject>')
+def quiz(subject):
+
+    if not db_connected:
+        return """
+        <h2>Database not connected!</h2>
+        <p>This project works fully on local MySQL.</p>
+        """
+
+    cursor.execute(
+        "SELECT * FROM questions WHERE subject=%s ORDER BY RAND() LIMIT 5",
+        (subject,)
+    )
+
+    quiz_questions = cursor.fetchall()
+
+    session['quiz_questions'] = quiz_questions
+    session['subject'] = subject
+
+    return render_template(
+        'quiz.html',
+        questions=quiz_questions,
+        subject=subject
+    )
+
+
+# -----------------------------------
 # SUBMIT QUIZ
-# -------------------------------
+# -----------------------------------
 @app.route('/submit', methods=['POST'])
 def submit():
 
-    global username
-    global selected_subject
-    global quiz_questions
+    if not db_connected:
+        return "<h2>Database not connected</h2>"
+
+    username = session.get('username')
+    quiz_questions = session.get('quiz_questions')
+    subject = session.get('subject')
 
     score = 0
 
-    user_answers = {}
-    correct_answers = {}
-
     for i, q in enumerate(quiz_questions):
 
-        question_id = f"q{i+1}"
-
-        user_answer = request.form.get(question_id)
-
-        correct_answer = q['answer']
-
-        user_answers[question_id] = user_answer
-        correct_answers[question_id] = correct_answer
+        user_answer = request.form.get(f"q{i+1}")
+        correct_answer = q[4]
 
         if user_answer == correct_answer:
             score += 1
@@ -207,55 +97,60 @@ def submit():
 
     status = "Pass ✅" if percentage >= 50 else "Fail ❌"
 
-    # Save Result
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
+    # Save result
     cursor.execute(
-        "INSERT INTO results (name, subject, score) VALUES (?, ?, ?)",
-        (username, selected_subject, score)
+        "INSERT INTO results (name, score, subject) VALUES (%s, %s, %s)",
+        (username, score, subject)
     )
 
-    conn.commit()
-    conn.close()
+    db.commit()
 
     return render_template(
-        "result.html",
+        'result.html',
         username=username,
-        subject=selected_subject,
         score=score,
         percentage=percentage,
         status=status,
-        answers=correct_answers,
-        user_answers=user_answers
+        subject=subject
     )
 
 
-# -------------------------------
+# -----------------------------------
 # LEADERBOARD
-# -------------------------------
-@app.route('/leaderboard')
-def leaderboard():
+# -----------------------------------
+@app.route('/leaderboard/<subject>')
+def leaderboard(subject):
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    if not db_connected:
+        return "<h2>Database not connected</h2>"
 
     cursor.execute(
-        "SELECT * FROM results ORDER BY score DESC"
+        "SELECT * FROM results WHERE subject=%s ORDER BY score DESC",
+        (subject,)
     )
 
     data = cursor.fetchall()
 
-    conn.close()
-
     return render_template(
         'leaderboard.html',
-        data=data
+        data=data,
+        subject=subject
     )
 
 
-# -------------------------------
+# -----------------------------------
+# LOGOUT
+# -----------------------------------
+@app.route('/logout')
+def logout():
+
+    session.clear()
+
+    return render_template('login.html')
+
+
+# -----------------------------------
 # RUN APP
-# -------------------------------
+# -----------------------------------
 if __name__ == '__main__':
     app.run(debug=True)
